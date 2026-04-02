@@ -1,124 +1,183 @@
 "use client";
+
 import { useState } from "react";
 
-function renderMarkdown(text: string) {
-  return text.split("\n").map((line, i) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("# ")) return <h1 key={i} className="text-2xl font-bold text-emerald-100 mt-6 mb-3">{trimmed.replace("# ","")}</h1>;
-    if (trimmed.startsWith("## ")) return <h2 key={i} className="text-xl font-bold text-white mt-7 mb-3">{trimmed.replace("## ","")}</h2>;
-    if (trimmed.startsWith("### ")) return <h3 key={i} className="text-base font-bold text-emerald-300 mt-4 mb-2">{trimmed.replace("### ","")}</h3>;
-    if (trimmed.startsWith("- ")) return <li key={i} className="text-slate-300 text-sm ml-4 mb-1 list-disc">{trimmed.replace("- ","")}</li>;
-    if (trimmed.startsWith("| ")) return <div key={i} className="text-emerald-200 text-sm font-mono my-0.5">{trimmed}</div>;
-    if (trimmed.startsWith("> ")) return <blockquote key={i} className="border-l-4 border-emerald-400 pl-4 italic text-slate-400 text-sm my-3">{trimmed.replace("> ","")}</blockquote>;
-    if (trimmed === "") return <div key={i} className="h-2" />;
-    return <p key={i} className="text-slate-300 text-sm leading-relaxed mb-1">{trimmed}</p>;
-  });
-}
+const ACCENT = "green";
 
-export default function Home() {
-  const [orgName, setOrgName] = useState("");
-  const [grantType, setGrantType] = useState("");
-  const [projectDesc, setProjectDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [timeline, setTimeline] = useState("");
-  const [result, setResult] = useState("");
+export default function GrantApplicationGenerator() {
+  const [form, setForm] = useState({
+    agencyProgram: "",
+    applicantOrg: "",
+    projectDescription: "",
+    fundingAmount: "",
+    deadline: "",
+    eligibility: "",
+  });
+  const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
 
-  const generate = async () => {
-    if (!orgName.trim()) { setError("Organization name is required."); return; }
-    setLoading(true); setError(""); setResult(""); setDone(false);
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setOutput("");
+    setError("");
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orgName, grantType, projectDesc, amount, timeline }),
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            {
+              role: "user",
+              content: `You are an expert government grant writer. Generate a complete grant application package.\n\nFUNDING AGENCY/PROGRAM: ${form.agencyProgram}\nAPPLICANT ORGANIZATION: ${form.applicantOrg}\nPROJECT DESCRIPTION: ${form.projectDescription}\nFUNDING AMOUNT REQUESTED: ${form.fundingAmount}\nAPPLICATION DEADLINE: ${form.deadline}\nELIGIBILITY REQUIREMENTS: ${form.eligibility}\n\nGenerate the following clearly labeled sections:\n1. GRANT APPLICATION NARRATIVE (4-5 paragraphs: statement of need, project goals, methodology/approach, evaluation plan, sustainability)\n2. BUDGET JUSTIFICATION (line-item budget narrative explaining each cost category and how it directly supports the project)\n3. WORK PLAN / TIMELINE (12-month work plan with major milestones and deliverables)\n4. EVALUATION CRITERIA RESPONSE (address each evaluation criterion listed by the agency with specific responses)\n5. SF-424 NOTES (guidance and tips for completing the SF-424 federal grant application form fields)\n\nUse formal, compelling grant-writing language. Be specific and evidence-based.`,
+            },
+          ],
+          max_tokens: 3000,
+          temperature: 0.7,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Generation failed."); return; }
-      setResult(data.result); setDone(true);
-    } catch { setError("Failed to connect."); }
-    finally { setLoading(false); }
+      if (!res.ok) throw new Error(data.error || "Generation failed");
+      setOutput(data.choices?.[0]?.message?.content || "No output received.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const accentStyles: Record<string, { border: string; bg: string; text: string; heading: string; gradient: string }> = {
+    green: { border: "border-green-500", bg: "bg-green-500/10", text: "text-green-300", heading: "text-green-400", gradient: "linear-gradient(to right, #16a34a, #15803d)" },
+    blue: { border: "border-blue-500", bg: "bg-blue-500/10", text: "text-blue-300", heading: "text-blue-400", gradient: "linear-gradient(to right, #2563eb, #1d4ed8)" },
+    violet: { border: "border-violet-500", bg: "bg-violet-500/10", text: "text-violet-300", heading: "text-violet-400", gradient: "linear-gradient(to right, #7c3aed, #6d28d9)" },
+    amber: { border: "border-amber-500", bg: "bg-amber-500/10", text: "text-amber-300", heading: "text-amber-400", gradient: "linear-gradient(to right, #d97706, #b45309)" },
+    rose: { border: "border-rose-500", bg: "bg-rose-500/10", text: "text-rose-300", heading: "text-rose-400", gradient: "linear-gradient(to right, #e11d48, #be123c)" },
+    teal: { border: "border-teal-500", bg: "bg-teal-500/10", text: "text-teal-300", heading: "text-teal-400", gradient: "linear-gradient(to right, #0d9488, #0f766e)" },
+    cyan: { border: "border-cyan-500", bg: "bg-cyan-500/10", text: "text-cyan-300", heading: "text-cyan-400", gradient: "linear-gradient(to right, #0891b2, #0e7490)" },
+    orange: { border: "border-orange-500", bg: "bg-orange-500/10", text: "text-orange-300", heading: "text-orange-400", gradient: "linear-gradient(to right, #ea580c, #c2410c)" },
+    pink: { border: "border-pink-500", bg: "bg-pink-500/10", text: "text-pink-300", heading: "text-pink-400", gradient: "linear-gradient(to right, #db2777, #be185d)" },
+  };
+
+  const s = accentStyles[ACCENT];
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-950 to-slate-950">
-      <header className="border-b border-white/10 sticky top-0 z-10 bg-slate-950/80 backdrop-blur">
-        <div className="max-w-4xl mx-auto px-6 py-5 flex items-center gap-3">
-          <span className="text-3xl">📝</span>
-          <div>
-            <h1 className="text-xl font-bold text-white">AI Grant Application Generator</h1>
-            <p className="text-xs text-slate-400">Nonprofit proposals · Foundation grants · DeepSeek</p>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-white">Write Grant Proposals That Win 📝</h2>
-          <p className="text-slate-400 text-sm max-w-md mx-auto mt-1">Generate a complete, compelling grant proposal with narrative, budget justification, and evaluation plan.</p>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-950 to-gray-900 text-white">
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="mb-8">
+          <h1 className={`text-3xl font-bold ${s.heading} mb-2`}>
+            💰 AI Grant Application Generator
+          </h1>
+          <p className="text-gray-400">
+            Generate complete grant application packages including narratives, budgets, and
+            SF-424 guidance — powered by DeepSeek.
+          </p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-5 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-white font-semibold text-sm block mb-2">🏢 Organization Name *</label>
-              <input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g. Green Futures Foundation"
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              <label className="block text-sm text-gray-300 mb-1">Funding Agency / Program</label>
+              <input
+                name="agencyProgram"
+                value={form.agencyProgram}
+                onChange={handleChange}
+                placeholder="e.g., EPA Environmental Justice Grants"
+                required
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
             </div>
             <div>
-              <label className="text-white font-semibold text-sm block mb-2">🏛️ Grant Type / Funder</label>
-              <input value={grantType} onChange={(e) => setGrantType(e.target.value)} placeholder="e.g. NSF Research Grant"
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              <label className="block text-sm text-gray-300 mb-1">Applicant Organization</label>
+              <input
+                name="applicantOrg"
+                value={form.applicantOrg}
+                onChange={handleChange}
+                placeholder="e.g., Green Valley Community Alliance"
+                required
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Funding Amount Requested</label>
+              <input
+                name="fundingAmount"
+                value={form.fundingAmount}
+                onChange={handleChange}
+                placeholder="e.g., $250,000"
+                required
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-1">Application Deadline</label>
+              <input
+                name="deadline"
+                value={form.deadline}
+                onChange={handleChange}
+                placeholder="e.g., May 15, 2026"
+                required
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
             </div>
           </div>
+
           <div>
-            <label className="text-white font-semibold text-sm block mb-2">📋 Project Description *</label>
-            <textarea value={projectDesc} onChange={(e) => setProjectDesc(e.target.value)} rows={3}
-              placeholder="Describe the project this grant would fund — be specific about what, who benefits, and why it matters..."
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none" />
+            <label className="block text-sm text-gray-300 mb-1">Project Description</label>
+            <textarea
+              name="projectDescription"
+              value={form.projectDescription}
+              onChange={handleChange}
+              placeholder="Describe your project goals, activities, target population, and expected outcomes..."
+              rows={4}
+              required
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-white font-semibold text-sm block mb-2">💵 Amount Requested</label>
-              <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. $50,000"
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-            </div>
-            <div>
-              <label className="text-white font-semibold text-sm block mb-2">📅 Project Timeline</label>
-              <input value={timeline} onChange={(e) => setTimeline(e.target.value)} placeholder="e.g. 18 months"
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-            </div>
+
+          <div>
+            <label className="block text-sm text-gray-300 mb-1">Eligibility Requirements</label>
+            <textarea
+              name="eligibility"
+              value={form.eligibility}
+              onChange={handleChange}
+              placeholder="List the eligibility requirements from the funding announcement..."
+              rows={3}
+              required
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
           </div>
-          <button onClick={generate} disabled={loading}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2">
-            {loading ? <><span className="animate-spin text-xl">⚙️</span> Writing grant proposal...</> : <><span>📝</span> Generate Grant Proposal</>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ background: loading ? "#374151" : s.gradient }}
+            className="w-full py-3 rounded-lg font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loading ? "Generating..." : "Generate Grant Application Package"}
           </button>
-        </div>
 
-        {error && <div className="bg-red-500/20 border border-red-500/40 rounded-xl px-5 py-3 text-red-300 text-sm">{error}</div>}
+          {error && (
+            <div className="border border-red-500 bg-red-500/10 text-red-300 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+        </form>
 
-        {done && result && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 bg-emerald-500/10 border-b border-emerald-500/20">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">📝</span>
-                <p className="text-emerald-300 font-bold text-sm">Grant Proposal: {orgName}</p>
-              </div>
-              <button onClick={() => navigator.clipboard?.writeText(result)}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 text-xs border border-white/10 transition-all">
-                📋 Copy All
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              {renderMarkdown(result)}
-            </div>
+        {output && (
+          <div className={`border ${s.border} ${s.bg} rounded-xl p-6`}>
+            <h2 className={`text-xl font-bold ${s.heading} mb-4`}>Generated Output</h2>
+            <pre className="whitespace-pre-wrap text-gray-200 text-sm font-mono leading-relaxed">
+              {output}
+            </pre>
           </div>
         )}
-
-        <p className="text-center text-xs text-slate-600">AI Grant Application Generator · {new Date().getFullYear()} · DeepSeek</p>
       </div>
-    </main>
+    </div>
   );
 }
